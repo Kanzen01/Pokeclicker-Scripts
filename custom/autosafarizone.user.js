@@ -367,10 +367,14 @@ function loadSetting(key, defaultVal) {
 
 function loadScript() {
   const oldInit = Preload.hideSplashScreen;
+  var hasInitialized = false;
 
-  Preload.hideSplashScreen = function () {
-    const result = oldInit.apply(this, arguments);
-    initAutoSafari();
+  Preload.hideSplashScreen = function (...args) {
+    const result = oldInit.apply(this, args);
+    if (App.game && !hasInitialized) {
+      initAutoSafari();
+      hasInitialized = true;
+    }
     return result;
   };
 }
