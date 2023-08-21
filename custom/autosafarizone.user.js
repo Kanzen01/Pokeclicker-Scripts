@@ -39,9 +39,8 @@ function initAutoSafari() {
   var autoSafariProcessId;
   var skipTicks = 0;
 
-  const GRASS_GRID_VALUE = 10;
   const CACHED_ANIM_SPEEDS = Object.assign({}, SafariBattle.Speed);
-  const AUTO_SAFARI_TICK_SPEED = 275;  // Slightly longer than movement speed (0.25s) to avoid graphical glitches
+  const CACHED_MOVE_SPEED = Safari.moveSpeed;
   // Faux enum
   const DIRECTIONS = {
     up: 0,
@@ -60,7 +59,8 @@ function initAutoSafari() {
     gettingItems = false;
     forceSkipItems = false;
     cachedPath.length = 0;
-    autoSafariProcessId = setInterval(doSafariTick, AUTO_SAFARI_TICK_SPEED);
+    // Interval slightly longer than movement speed (0.25s by default) to avoid graphical glitches
+    autoSafariProcessId = setInterval(doSafariTick, Safari.moveSpeed + 25);
   }
 
 
@@ -119,7 +119,7 @@ function initAutoSafari() {
       }
       if (!cachedPath.length) {
         // TODO seek water for water encounters in next game version
-        cachedPath = findShortestPathToValue(GRASS_GRID_VALUE);
+        cachedPath = findShortestPathToValue(GameConstants.SafariTile.grass);
       }
       if (cachedPath.length) {
         moveCharacter(cachedPath);
@@ -219,7 +219,7 @@ function initAutoSafari() {
       for (let col = 0; col < numCols; col += 1) {
         if (Safari.grid[row][col] === targetValue) {
           // If searching for grass tiles, skipping it if isolated 
-          if (!(targetValue == GRASS_GRID_VALUE && isIsolatedTile(row, col, targetValue))) {
+          if (!(targetValue == GameConstants.SafariTile.grass && isIsolatedTile(row, col, targetValue))) {
             targetPositions.push([row, col]);
           }
         }
@@ -288,7 +288,7 @@ function initAutoSafari() {
     });
 
     if (autoSafariFastAnimationsState) {
-      autoSafariFastAnimations()
+      autoSafariFastAnimations();
     }
   }
 
@@ -330,6 +330,11 @@ function initAutoSafari() {
   function autoSafariFastAnimations() {
     for (const anim of Object.keys(SafariBattle.Speed)) {
       SafariBattle.Speed[anim] = autoSafariFastAnimationsState ? 0 : CACHED_ANIM_SPEEDS[anim];
+    }
+    Safari.moveSpeed = autoSafariFastAnimationsState ? CACHED_MOVE_SPEED / 2 : CACHED_MOVE_SPEED;
+    if (autoSafariState) {
+      clearInterval(autoSafariProcessId);
+      startAutoSafari();
     }
   }
 
