@@ -196,7 +196,9 @@ function initAutoSafari() {
         if (
           isValidPosition(nextRow, nextCol)
           && !visited.has(nextPosStr)
-          && GameConstants.LEGAL_WALK_BLOCKS.includes(Safari.grid[nextRow][nextCol])
+          && (GameConstants.SAFARI_LEGAL_WALK_BLOCKS.includes(Safari.grid[nextRow][nextCol])
+            || GameConstants.SAFARI_WATER_BLOCKS.includes(Safari.grid[nextRow][nextCol])
+          )
         ) {
           {
             const nextPath = currentPath.concat([direction]);
