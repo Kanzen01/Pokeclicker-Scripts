@@ -196,10 +196,10 @@ function initAutoSafari() {
       for (const [nextRow, nextCol, direction] of adjacent) {
         const nextPosStr = `${nextRow}-${nextCol}`;
 
-        if (
-          isValidPosition(nextRow, nextCol)
-          && !visited.has(nextPosStr)
-          && GameConstants.LEGAL_WALK_BLOCKS.includes(Safari.grid[nextRow][nextCol])
+        // TODO remove SAFARI_WATER_BLOCKS after game update makes it redundant
+        if (isValidPosition(nextRow, nextCol) && !visited.has(nextPosStr)
+          && (GameConstants.SAFARI_LEGAL_WALK_BLOCKS.includes(Safari.grid[nextRow][nextCol])
+            || GameConstants.SAFARI_WATER_BLOCKS.includes(Safari.grid[nextRow][nextCol]))
         ) {
           {
             const nextPath = currentPath.concat([direction]);
