@@ -27,9 +27,8 @@ function initAutoSafari() {
   var autoSafariState = false;
   var autoSafariPickItemsState = loadSetting('autoSafariPickItemsState', true);
   var autoSafariThrowBaitsState = loadSetting('autoSafariThrowBaitsState', false);
-  var autoSafariCatchAllState = loadSetting('autoSafariCatchAllState', false);
-  var autoSafariPrioritizeUncaught = loadSetting('autoSafariPrioritizeUncaught', false);
-  var autoSafariPrioritizeContagious = loadSetting('autoSafariPrioritizeContagious', false);
+  var autoSafariSeekUncaught = loadSetting('autoSafariSeekUncaught', false);
+  var autoSafariSeekContagious = loadSetting('autoSafariSeekContagious', false);
   var autoSafariFastAnimationsState = loadSetting('autoSafariFastAnimationsState', false);
 
   var cachedPath = [];
@@ -145,14 +144,14 @@ function initAutoSafari() {
   function findShortestPathToEncounters() {
     // If prioritizing uncaught/contagious, check if water and grass encounters have any
     function isPriority(mon) {
-      return (autoSafariPrioritizeUncaught && !App.game.party.alreadyCaughtPokemonByName(mon)) ||
-        (autoSafariPrioritizeContagious && App.game.party.getPokemonByName(mon)?.pokerus === GameConstants.Pokerus.Contagious);
+      return (autoSafariSeekUncaught && !App.game.party.alreadyCaughtPokemonByName(mon)) ||
+        (autoSafariSeekContagious && App.game.party.getPokemonByName(mon)?.pokerus === GameConstants.Pokerus.Contagious);
     }
 
     let needGrass = false;
     let needWater = false;
 
-    if (autoSafariPrioritizeUncaught || autoSafariPrioritizeContagious) {
+    if (autoSafariSeekUncaught || autoSafariSeekContagious) {
       needGrass = SafariPokemonList.list[player.region].some((p) => p.environments.includes(SafariEnvironments.Grass) && isPriority(p.name));
       needWater = SafariPokemonList.list[player.region].some((p) => p.environments.includes(SafariEnvironments.Water) && isPriority(p.name));
     }
@@ -241,7 +240,7 @@ function initAutoSafari() {
     if (autoSafariThrowBaitsState && App.game.statistics.safariBaitThrown() <= 1000) {
       SafariBattle.throwBait();
     } else if (!forceRunAway
-      && (autoSafariCatchAllState
+      && (true // placeholder
         || App.game.party.getPokemon(SafariBattle.enemy.id)?.pokerus === GameConstants.Pokerus.Contagious
         || SafariBattle.enemy.shiny
         || !App.game.party.alreadyCaughtPokemon(SafariBattle.enemy.id))
@@ -258,28 +257,44 @@ function initAutoSafari() {
     }
   }
 
+  function autoSafariFastAnimations() {
+    for (const anim of Object.keys(SafariBattle.Speed)) {
+      if (['enemyFlee', 'enemyCaught', 'turnLength', 'gameOver'].includes(anim)) {
+        SafariBattle.Speed[anim] = autoSafariFastAnimationsState ? CACHED_ANIM_SPEEDS[anim] / 2 : CACHED_ANIM_SPEEDS[anim];
+      } else {
+        SafariBattle.Speed[anim] = autoSafariFastAnimationsState ? 0 : CACHED_ANIM_SPEEDS[anim];
+      }
+    }
+    Safari.moveSpeed = autoSafariFastAnimationsState ? CACHED_MOVE_SPEED / 2 : CACHED_MOVE_SPEED;
+    if (autoSafariState) {
+      clearInterval(autoSafariProcessId);
+      startAutoSafari();
+    }
+  }
+
   function createHTML() {
     const safariModal = document.getElementById('safariModal');
     const modalHeader = safariModal.querySelector('.modal-header');
 
     const buttonsContainer = document.createElement('div');
 
-    const createButton = (name, state, func) => {
+    const createButton = (name, text, state, func) => {
       var button = document.createElement('button');
       button.setAttribute('id', `auto-${name}-toggle`);
       button.classList.add('btn', 'btn-block', 'btn-' + (state ? 'success' : 'danger'));
       button.setAttribute('style', 'font-size: 8pt; display: flex; align-items: center; justify-content: center; margin: 0px !important;')
-      button.textContent = `Auto ${name[0].toUpperCase() + name.slice(1)}\n[${state ? 'ON' : 'OFF'}]`;
+      button.textContent = `Auto ${text}\n[${state ? 'ON' : 'OFF'}]`;
       button.onclick = function () { func(); };
 
       buttonsContainer.appendChild(button);
     }
 
-    createButton('safari', autoSafariState, toggleAutoSafari)
-    createButton('pick-items', autoSafariPickItemsState, toggleAutoPickItems)
-    createButton('fast-anim', autoSafariFastAnimationsState, toggleFastAnimations)
-    createButton('throw-baits', autoSafariThrowBaitsState, toggleThrowBaits)
-    createButton('catch-all', autoSafariCatchAllState, toggleCatchAll)
+    createButton('safari', 'Safari', autoSafariState, toggleAutoSafari);
+    createButton('pick-items', 'Pick Items', autoSafariPickItemsState, toggleAutoPickItems);
+    createButton('throw-baits', 'Throw Bait', autoSafariThrowBaitsState, toggleThrowBaits);
+    createButton('seek-uncaught', 'Seek New', autoSafariSeekUncaught, toggleSeekUncaught);
+    createButton('seek-contagious', 'Seek PKRS', autoSafariSeekContagious, toggleSeekContagious);
+    createButton('fast-anim', 'Fast Anim', autoSafariFastAnimationsState, toggleFastAnimations);
 
     buttonsContainer.setAttribute('style', 'display: flex; height: 24px;')
     buttonsContainer.style.display = 'flex';
@@ -318,33 +333,7 @@ function initAutoSafari() {
     toggleButton.classList.toggle('btn-danger', !autoSafariPickItemsState);
     toggleButton.classList.toggle('btn-success', autoSafariPickItemsState);
     localStorage.setItem('autoSafariPickItemsState', autoSafariPickItemsState);
-    document.getElementById('auto-pick-items-toggle').innerHTML = `Auto Pick-items [${autoSafariPickItemsState ? 'ON' : 'OFF'}]`;
-  }
-
-  function toggleFastAnimations() {
-    autoSafariFastAnimationsState = !autoSafariFastAnimationsState;
-    const toggleButton = document.getElementById('auto-fast-anim-toggle');
-    toggleButton.classList.toggle('btn-danger', !autoSafariFastAnimationsState);
-    toggleButton.classList.toggle('btn-success', autoSafariFastAnimationsState);
-    localStorage.setItem('autoSafariFastAnimationsState', autoSafariFastAnimationsState);
-    document.getElementById('auto-fast-anim-toggle').innerHTML = `Auto Fast-anim [${autoSafariFastAnimationsState ? 'ON' : 'OFF'}]`;
-
-    autoSafariFastAnimations();
-  }
-
-  function autoSafariFastAnimations() {
-    for (const anim of Object.keys(SafariBattle.Speed)) {
-      if (['enemyFlee', 'enemyCaught', 'turnLength', 'gameOver'].includes(anim)) {
-        SafariBattle.Speed[anim] = autoSafariFastAnimationsState ? CACHED_ANIM_SPEEDS[anim] / 2 : CACHED_ANIM_SPEEDS[anim];
-      } else {
-        SafariBattle.Speed[anim] = autoSafariFastAnimationsState ? 0 : CACHED_ANIM_SPEEDS[anim];
-      }
-    }
-    Safari.moveSpeed = autoSafariFastAnimationsState ? CACHED_MOVE_SPEED / 2 : CACHED_MOVE_SPEED;
-    if (autoSafariState) {
-      clearInterval(autoSafariProcessId);
-      startAutoSafari();
-    }
+    document.getElementById('auto-pick-items-toggle').innerHTML = `Auto Pick Items [${autoSafariPickItemsState ? 'ON' : 'OFF'}]`;
   }
 
   function toggleThrowBaits() {
@@ -353,15 +342,36 @@ function initAutoSafari() {
     toggleButton.classList.toggle('btn-danger', !autoSafariThrowBaitsState);
     toggleButton.classList.toggle('btn-success', autoSafariThrowBaitsState);
     localStorage.setItem('autoSafariThrowBaitsState', autoSafariThrowBaitsState);
-    document.getElementById('auto-throw-baits-toggle').innerHTML = `Auto Throw-baits [${autoSafariThrowBaitsState ? 'ON' : 'OFF'}]`;
+    document.getElementById('auto-throw-baits-toggle').innerHTML = `Auto Throw Baits [${autoSafariThrowBaitsState ? 'ON' : 'OFF'}]`;
   }
-  function toggleCatchAll() {
-    autoSafariCatchAllState = !autoSafariCatchAllState;
-    const toggleButton = document.getElementById('auto-catch-all-toggle');
-    toggleButton.classList.toggle('btn-danger', !autoSafariCatchAllState);
-    toggleButton.classList.toggle('btn-success', autoSafariCatchAllState);
-    localStorage.setItem('autoSafariCatchAllState', autoSafariCatchAllState);
-    document.getElementById('auto-catch-all-toggle').innerHTML = `Auto Catch-all [${autoSafariCatchAllState ? 'ON' : 'OFF'}]`;
+
+  function toggleSeekUncaught() {
+    autoSafariSeekUncaught = !autoSafariSeekUncaught;
+    const toggleButton = document.getElementById('auto-seek-uncaught-toggle');
+    toggleButton.classList.toggle('btn-danger', !autoSafariSeekUncaught);
+    toggleButton.classList.toggle('btn-success', autoSafariSeekUncaught);
+    localStorage.setItem('autoSafariSeekUncaught', autoSafariSeekUncaught);
+    document.getElementById('auto-seek-uncaught-toggle').innerHTML = `Auto Seek Uncaught [${autoSafariSeekUncaught ? 'ON' : 'OFF'}]`;
+  }
+
+  function toggleSeekContagious() {
+    autoSafariSeekContagious = !autoSafariSeekContagious;
+    const toggleButton = document.getElementById('auto-seek-contagious-toggle');
+    toggleButton.classList.toggle('btn-danger', !autoSafariSeekContagious);
+    toggleButton.classList.toggle('btn-success', autoSafariSeekContagious);
+    localStorage.setItem('autoSafariSeekContagious', autoSafariSeekContagious);
+    document.getElementById('auto-seek-contagious-toggle').innerHTML = `Auto Seek PKRS [${autoSafariSeekContagious ? 'ON' : 'OFF'}]`;
+  }
+
+  function toggleFastAnimations() {
+    autoSafariFastAnimationsState = !autoSafariFastAnimationsState;
+    const toggleButton = document.getElementById('auto-fast-anim-toggle');
+    toggleButton.classList.toggle('btn-danger', !autoSafariFastAnimationsState);
+    toggleButton.classList.toggle('btn-success', autoSafariFastAnimationsState);
+    localStorage.setItem('autoSafariFastAnimationsState', autoSafariFastAnimationsState);
+    document.getElementById('auto-fast-anim-toggle').innerHTML = `Auto Fast Anim [${autoSafariFastAnimationsState ? 'ON' : 'OFF'}]`;
+
+    autoSafariFastAnimations();
   }
 }
 
