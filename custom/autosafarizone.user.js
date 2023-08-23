@@ -30,6 +30,9 @@ function initAutoSafari() {
   var autoSafariThrowBaitsState = loadSetting('autoSafariThrowBaitsState', false);
   var autoSafariCatchAllState = loadSetting('autoSafariCatchAllState', false);
 
+  var autoSafariPrioritizeUncaught = false;
+  var autoSafariPrioritizeContagious = false;
+
   var cachedPath = [];
   // Tells when we try to pick items and skip fights or run away when only 1 ball left
   var gettingItems = false;
@@ -117,8 +120,7 @@ function initAutoSafari() {
         gettingItems = false;
       }
       if (!cachedPath.length) {
-        // TODO seek water for water encounters in next game version
-        cachedPath = findShortestPathToValue(GameConstants.SafariTile.grass);
+        cachedPath = findShortestPathToValues(chooseEncounterTiles());
       }
       if (cachedPath.length) {
         moveCharacter(cachedPath);
@@ -136,9 +138,29 @@ function initAutoSafari() {
     }
   }
 
-  function findShortestPathToValue(target) {
-    // find all tiles of a certain value
-    tiles = findTilesWithValue(target);
+  function chooseEncounterTiles() {
+    // Decide whether to seek water or 
+    function isPriority(mon) {
+      return (autoSafariPrioritizeUncaught && !App.game.party.alreadyCaughtPokemonByName(mon)) ||
+        (autoSafariPrioritizeContagious && App.game.party.getPokemonByName(mon)?.pokerus === GameConstants.Pokerus.Contagious);
+    }
+
+    let needGrass = SafariPokemonList.list[player.region].some((p) => p.environments.includes(SafariEnvironments.Grass) && isPriority(p.name));
+    let needWater = SafariPokemonList.list[player.region].some((p) => p.environments.includes(SafariEnvironments.Water) && isPriority(p.name));
+
+    if (needGrass ^ needWater) {
+      return needGrass ? [GameConstants.SafariTile.grass] : [...GameConstants.SAFARI_WATER_BLOCKS];
+    } else {
+      return GameConstants.SAFARI_WATER_BLOCKS.concat(GameConstants.SafariTile.grass);
+    }
+  }
+
+  function findShortestPathToValues(tileTypes) {
+    var tiles = [];
+    for (const type of tileTypes) {
+      // find all tiles of given values
+      tiles = tiles.concat(findTilesWithValue(type));
+    } 
     return findShortestPathToTiles(tiles);
   }
 
@@ -234,8 +256,7 @@ function initAutoSafari() {
       SafariBattle.throwBait();
     } else if (!forceRunAway
       && (autoSafariCatchAllState
-        || (App.game.party.getPokemon(SafariBattle.enemy.id)?.pokerus !== GameConstants.Pokerus.Uninfected
-          && App.game.party.getPokemon(SafariBattle.enemy.id)?.evs() < 50)
+        || App.game.party.getPokemon(SafariBattle.enemy.id)?.pokerus === GameConstants.Pokerus.Contagious
         || SafariBattle.enemy.shiny
         || !App.game.party.alreadyCaughtPokemon(SafariBattle.enemy.id))
       // to not skip lots of items if we use multiple pokeballs on the last fight
