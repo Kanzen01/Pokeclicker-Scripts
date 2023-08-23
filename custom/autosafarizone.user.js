@@ -99,20 +99,16 @@ function initAutoSafari() {
   function processSafari() {
     // Performs actions within the Safari: picking items, moving
     if (autoSafariPickState && Safari.itemGrid().length > 0 && Safari.balls() == 1 && !forceSkipItems) {
-      console.log('Item time')
       if (!gettingItems) {
-        console.log('Clearing cached path ' + cachedPath)
         cachedPath.length = 0;
         gettingItems = true; // trying to pick up items, set to skip fights
       }
       if (!cachedPath.length) {
         cachedPath = findShortestPathToTiles(Safari.itemGrid().map(({ x, y }) => [y, x]));
-        console.log(cachedPath)
       }
       if (cachedPath.length) {
         moveCharacter(cachedPath);
       } else {
-        console.log('Force skipping items')
         forceSkipItems = true;
       }
     } else {
