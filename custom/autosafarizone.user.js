@@ -4,7 +4,7 @@
 // ==UserScript==
 // @name          [Pokeclicker] Auto Safari Zone
 // @namespace     Pokeclicker Scripts
-// @author        Kanzen01 (Credit: Ephenia)
+// @author        Kanzen01 (Credit: Ephenia, Optimatum)
 // @description   Adds in toggable options to move/catch pokemons/pick up items and have fast animations on both safari zones
 // @copyright     https://github.com/Kanzen01
 // @license       GPL-3.0 License
@@ -60,9 +60,8 @@ function initAutoSafari() {
     forceSkipItems = false;
     cachedPath.length = 0;
     // Interval slightly longer than movement speed (0.25s by default) to avoid graphical glitches
-    autoSafariProcessId = setInterval(doSafariTick, Safari.moveSpeed + 25);
+    autoSafariProcessId = setInterval(doSafariTick, tickSpeed());
   }
-
 
   function doSafariTick() {
     if (skipTicks) {
@@ -74,6 +73,10 @@ function initAutoSafari() {
     } else {
       processSafari();
     }
+  }
+
+  function tickSpeed() {
+    return Safari.moveSpeed + 25;
   }
 
   function enterSafari() {
@@ -231,15 +234,14 @@ function initAutoSafari() {
 
   function fightSafariPokemon(forceRunAway = gettingItems) {
     // TODO skip ticks proportional to animation speed
-    // TODO scale speed with safari level in next game version
     if (autoSafariThrowBaitsState && App.game.statistics.safariBaitThrown() <= 1000) {
       SafariBattle.throwBait();
     } else if (!forceRunAway
-      && ((App.game.party.getPokemon(SafariBattle.enemy.id)?.pokerus !== GameConstants.Pokerus.Uninfected
-        && App.game.party.getPokemon(SafariBattle.enemy.id)?.evs() < 50)
+      && (autoSafariCatchAllState
+        || (App.game.party.getPokemon(SafariBattle.enemy.id)?.pokerus !== GameConstants.Pokerus.Uninfected
+          && App.game.party.getPokemon(SafariBattle.enemy.id)?.evs() < 50)
         || SafariBattle.enemy.shiny
-        || !App.game.party.alreadyCaughtPokemon(SafariBattle.enemy.id)
-        || autoSafariCatchAllState)
+        || !App.game.party.alreadyCaughtPokemon(SafariBattle.enemy.id))
       // to not skip lots of items if we use multiple pokeballs on the last fight
       && !(Safari.balls() == 1 && Safari.itemGrid().length > 0 && !forceSkipItems)
     ) {
@@ -329,7 +331,11 @@ function initAutoSafari() {
 
   function autoSafariFastAnimations() {
     for (const anim of Object.keys(SafariBattle.Speed)) {
-      SafariBattle.Speed[anim] = autoSafariFastAnimationsState ? 0 : CACHED_ANIM_SPEEDS[anim];
+      if (['enemyFlee', 'enemyCaught', 'turnLength', 'gameOver'].includes(anim)) {
+        SafariBattle.Speed[anim] = autoSafariFastAnimationsState ? CACHED_ANIM_SPEEDS[anim] / 2 : CACHED_ANIM_SPEEDS[anim];
+      } else {
+        SafariBattle.Speed[anim] = autoSafariFastAnimationsState ? 0 : CACHED_ANIM_SPEEDS[anim];
+      }
     }
     Safari.moveSpeed = autoSafariFastAnimationsState ? CACHED_MOVE_SPEED / 2 : CACHED_MOVE_SPEED;
     if (autoSafariState) {
