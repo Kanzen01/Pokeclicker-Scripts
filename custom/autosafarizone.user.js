@@ -334,6 +334,10 @@ function initAutoSafari() {
     else {
       SafariBattle.throwBall();
     }
+    // Avoid breaking safari end
+    if (Safari.balls() == 0) {
+      skipTicks += 4 * (autoSafariFastAnimationsState ? 2 : 1);
+    }
   }
 
   function autoSafariFastAnimations() {
