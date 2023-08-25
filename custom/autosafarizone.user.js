@@ -288,7 +288,7 @@ function initAutoSafari() {
           SafariBattle.throwBait();
         } 
         // Bait is still alright if we have plenty of balls left
-        else if (Safari.balls() > 3) {
+        else if (Safari.balls() > 2) {
           SafariBattle.selectedBait(BaitList.Bait);
           SafariBattle.throwBait();
         }
@@ -298,7 +298,7 @@ function initAutoSafari() {
         }
       }
       // Running low on balls, throw rock (stacks with berry modifiers)
-      else if (!SafariBattle.enemy.angry && Safari.balls() <= 3) {
+      else if (!SafariBattle.enemy.angry && Safari.balls() <= 2) {
         SafariBattle.throwRock();
       }
       // Catch time, hopefully!
