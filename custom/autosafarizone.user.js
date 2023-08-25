@@ -336,7 +336,7 @@ function initAutoSafari() {
     }
     // Avoid breaking safari end
     if (Safari.balls() == 0) {
-      skipTicks += 4 * (autoSafariFastAnimationsState ? 2 : 1);
+      skipTicks += 6 * (autoSafariFastAnimationsState ? 2 : 1);
     }
   }
 
