@@ -256,6 +256,10 @@ function initAutoSafari() {
 
   function fightSafariPokemon() {
     // TODO skip ticks proportional to animation speed
+    const forceRunAway = gettingItems || (Safari.balls() == 1 && Safari.itemGrid().length > 0 && !forceSkipItems);
+    const isPriority = (autoSafariSeekUncaught && !App.game.party.alreadyCaughtPokemon(SafariBattle.enemy.id))
+        || (autoSafariSeekContagious && App.game.party.getPokemon(SafariBattle.enemy.id)?.pokerus === GameConstants.Pokerus.Contagious);
+
     if (SafariBattle.busy()) {
       return;
     } else if (!inBattle) {
@@ -266,9 +270,7 @@ function initAutoSafari() {
       }
       return;
     }
-    const forceRunAway = gettingItems || (Safari.balls() == 1 && Safari.itemGrid().length > 0 && !forceSkipItems);
-    const isPriority = (autoSafariSeekUncaught && !App.game.party.alreadyCaughtPokemon(SafariBattle.enemy.id))
-        || (autoSafariSeekContagious && App.game.party.getPokemon(SafariBattle.enemy.id)?.pokerus === GameConstants.Pokerus.Contagious);
+    
     // Handle shiny encounters specially
     if (SafariBattle.enemy.shiny) {
       let canNanab = App.game.farming.berryList[BerryType.Nanab]() > 5;
@@ -336,12 +338,6 @@ function initAutoSafari() {
 
   function autoSafariFastAnimations() {
     for (const anim of Object.keys(SafariBattle.Speed)) {
-      /*
-      if (['enemyFlee', 'enemyCaught', 'enemyEscape', 'turnLength', 'gameOver'].includes(anim)) {
-        SafariBattle.Speed[anim] = autoSafariFastAnimationsState ? CACHED_ANIM_SPEEDS[anim] / 2 : CACHED_ANIM_SPEEDS[anim];
-      } else {
-        SafariBattle.Speed[anim] = autoSafariFastAnimationsState ? 0 : CACHED_ANIM_SPEEDS[anim];
-      }*/
       SafariBattle.Speed[anim] = autoSafariFastAnimationsState ? CACHED_ANIM_SPEEDS[anim] / 2 : CACHED_ANIM_SPEEDS[anim];
     }
     Safari.moveSpeed = autoSafariFastAnimationsState ? CACHED_MOVE_SPEED / 2 : CACHED_MOVE_SPEED;
@@ -433,6 +429,7 @@ function initAutoSafari() {
     localStorage.setItem('autoSafariSeekUncaught', autoSafariSeekUncaught);
     document.getElementById('auto-seek-uncaught-toggle').innerHTML = `Auto Seek New [${autoSafariSeekUncaught ? 'ON' : 'OFF'}]`;
   }
+
 
   function toggleSeekContagious() {
     autoSafariSeekContagious = !autoSafariSeekContagious;
