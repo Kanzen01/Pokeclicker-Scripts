@@ -36,6 +36,8 @@ function initAutoSafari() {
   var gettingItems = false;
   // To skip items if they are generated in buggy sections of the grid
   var forceSkipItems = false;
+  var hasPriority = false;
+  var inBattle = false;
 
   var autoSafariProcessId;
   var skipTicks = 0;
@@ -87,7 +89,7 @@ function initAutoSafari() {
     }
     if (modalUtils.observableState.safariModal !== 'show') {
       Safari.openModal();
-      skipTicks = 1;
+      skipTicks = autoSafariFastAnimationsState ? 2 : 1;
     } else if (!Safari.inProgress() && Safari.canPay()) {
       Safari.payEntranceFee();
       forceSkipItems = false;
@@ -99,6 +101,7 @@ function initAutoSafari() {
 
   function processSafari() {
     // Performs actions within the Safari: picking items, moving
+    inBattle = false;
     if (autoSafariPickItemsState && Safari.itemGrid().length > 0 && Safari.balls() == 1 && !forceSkipItems) {
       if (!gettingItems) {
         cachedPath.length = 0;
@@ -152,10 +155,12 @@ function initAutoSafari() {
     let needWater = false;
 
     if (autoSafariSeekUncaught || autoSafariSeekContagious) {
-      needGrass = SafariPokemonList.list[player.region].some((p) => p.environments.includes(SafariEnvironments.Grass) && isPriority(p.name));
-      needWater = SafariPokemonList.list[player.region].some((p) => p.environments.includes(SafariEnvironments.Water) && isPriority(p.name));
+      needGrass = SafariPokemonList.list[player.region]().some((p) => p.environments.includes(SafariEnvironments.Grass) && isPriority(p.name));
+      needWater = SafariPokemonList.list[player.region]().some((p) => p.environments.includes(SafariEnvironments.Water) && isPriority(p.name));
     }
     
+    hasPriority = needGrass || needWater;
+
     let chosenTiles = [];
     if (needGrass) {
       chosenTiles.push(GameConstants.SafariTile.grass);
@@ -167,12 +172,13 @@ function initAutoSafari() {
       // No priority, either 
       chosenTiles.push(GameConstants.SafariTile.grass, ...GameConstants.SAFARI_WATER_BLOCKS);
     }
-
+    
     const encounterTiles = new Set(chosenTiles);
     return findShortestPathToTiles((row, col) => (encounterTiles.has(Safari.grid[row][col])) && !isIsolatedTile(row, col));
   }
 
   function isIsolatedTile(row, col) {
+    const tileType = Safari.grid[row][col];
     const adjacentTiles = [
       [row - 1, col],
       [row + 1, col],
@@ -180,8 +186,21 @@ function initAutoSafari() {
       [row, col + 1],
     ];
 
+    var compareFunc;
+    if (GameConstants.SafariTile.waterUL <= tileType && tileType <= GameConstants.SafariTile.waterDR) {
+      compareFunc = (t) => GameConstants.SAFARI_WATER_BLOCKS.includes(t);
+    } else if (GameConstants.SafariTile.sandUL <= tileType && tileType <= GameConstants.SafariTile.sandULinverted) {
+      compareFunc = (t) => GameConstants.SafariTile.sandUL <= t && t <= GameConstants.SafariTile.sandULinverted;
+    } else if (GameConstants.SafariTile.fenceUL <= tileType && tileType <= GameConstants.SafariTile.fenceDLend) {
+      compareFunc = (t) => GameConstants.SafariTile.fenceUL <= t && t <= GameConstants.SafariTile.fenceDLend;
+    } else if (GameConstants.SafariTile.treeTopL <= tileType && tileType <= GameConstants.SafariTile.treeRootsR) {
+      compareFunc = (t) => GameConstants.SafariTile.treeTopL <= t && t <= GameConstants.SafariTile.treeRootsR;
+    } else {
+      compareFunc = (t) => t === tileType;
+    }
+
     for (const [adjRow, adjCol] of adjacentTiles) {
-      if (isValidPosition(adjRow, adjCol) && Safari.grid[adjRow][adjCol] === Safari.grid[row][col]) {
+      if (isValidPosition(adjRow, adjCol) && compareFunc(Safari.grid[row][col], Safari.grid[adjRow][adjCol])) {
         return false; // Found an adjacent tile with the same value
       }
     }
@@ -195,7 +214,7 @@ function initAutoSafari() {
     return row >= 0 && row < numRows && col >= 0 && col < numCols;
   }
 
-  // Takes a test function and returns a path to the closest tile that satisfies it
+  // Using the given test function, returns a path to the closest tile satisfying it
   function findShortestPathToTiles(isPositionTarget) {
     const visited = new Set();
     const queue = [[Safari.playerXY.y, Safari.playerXY.x, []]];
@@ -235,37 +254,98 @@ function initAutoSafari() {
     return [];
   }
 
-  function fightSafariPokemon(forceRunAway = gettingItems) {
+  function fightSafariPokemon() {
     // TODO skip ticks proportional to animation speed
-    if (autoSafariThrowBaitsState && App.game.statistics.safariBaitThrown() <= 1000) {
-      SafariBattle.throwBait();
-    } else if (!forceRunAway
-      && (true // placeholder
-        || App.game.party.getPokemon(SafariBattle.enemy.id)?.pokerus === GameConstants.Pokerus.Contagious
-        || SafariBattle.enemy.shiny
-        || !App.game.party.alreadyCaughtPokemon(SafariBattle.enemy.id))
-      // to not skip lots of items if we use multiple pokeballs on the last fight
-      && !(Safari.balls() == 1 && Safari.itemGrid().length > 0 && !forceSkipItems)
-    ) {
-      if (SafariBattle.enemy.angry === 0) {
+    if (SafariBattle.busy()) {
+      return;
+    } else if (!inBattle) {
+      // Delay first action to reduce animation bugs
+      inBattle = true;
+      if (autoSafariFastAnimationsState) {
+        skipTicks += 1;
+      }
+      return;
+    }
+    const forceRunAway = gettingItems || (Safari.balls() == 1 && Safari.itemGrid().length > 0 && !forceSkipItems);
+    const isPriority = (autoSafariSeekUncaught && !App.game.party.alreadyCaughtPokemon(SafariBattle.enemy.id))
+        || (autoSafariSeekContagious && App.game.party.getPokemon(SafariBattle.enemy.id)?.pokerus === GameConstants.Pokerus.Contagious);
+    // Handle shiny encounters specially
+    if (SafariBattle.enemy.shiny) {
+      let canNanab = App.game.farming.berryList[BerryType.Nanab]() > 5;
+      let canRazz = App.game.farming.berryList[BerryType.Razz]() > 5;
+      // Bait is usually the best approach
+      if (!(SafariBattle.enemy.angry || SafariBattle.enemy.eating || SafariBattle.enemy.eatingBait !== BaitType.Bait)) {
+        // Nanab is highest catch chance, though not highest catch-per-ball efficiency
+        if (canNanab) {
+          SafariBattle.selectedBait(BaitList.Nanab);
+          SafariBattle.throwBait();
+        } 
+        // Razz is second best
+        else if (canRazz) {
+          SafariBattle.selectedBait(BaitList.Razz);
+          SafariBattle.throwBait();
+        } 
+        // Bait is still alright if we have plenty of balls left
+        else if (Safari.balls() > 3) {
+          SafariBattle.selectedBait(BaitList.Bait);
+          SafariBattle.throwBait();
+        }
+        // Throw rock and hope for the best
+        else {
+          SafariBattle.throwRock();
+        }
+      }
+      // Running low on balls, throw rock (stacks with berry modifiers)
+      else if (!SafariBattle.enemy.angry && Safari.balls() <= 3) {
         SafariBattle.throwRock();
-      } else {
+      }
+      // Catch time, hopefully!
+      else {
         SafariBattle.throwBall();
       }
-    } else {
+    }
+    // Not shiny
+    // Bait when no item in effect and no active berry modifier
+    else if (autoSafariThrowBaitsState && !(SafariBattle.enemy.angry || SafariBattle.enemy.eating || SafariBattle.enemy.eatingBait !== BaitType.Bait)) {
+      SafariBattle.selectedBait(BaitList.Bait);
+      if (isPriority && !forceRunAway) {
+        // Nanab into rock is best combo of catch chance and efficient ball use
+        // Don't waste Nanabs if they won't improve catch rate over just rocks
+        if (App.game.farming.berryList[BerryType.Nanab]() > 25 && SafariBattle.enemy.catchFactor < 100 / (2 + SafariBattle.enemy.levelModifier)) {
+          SafariBattle.selectedBait(BaitList.Nanab);
+        } 
+        // Razz into rock is second best
+        else if (App.game.farming.berryList[BerryType.Razz]() > 25) {
+          SafariBattle.selectedBait(BaitList.Razz);
+        }
+      }
+      SafariBattle.throwBait();
+    }
+    else if (forceRunAway || (hasPriority && !isPriority)) {
       SafariBattle.run();
+    }
+    // Rock time
+    else if (SafariBattle.enemy.angry === 0) {
+      SafariBattle.throwRock();
+    }
+    // Try to catch!
+    else {
+      SafariBattle.throwBall();
     }
   }
 
   function autoSafariFastAnimations() {
     for (const anim of Object.keys(SafariBattle.Speed)) {
-      if (['enemyFlee', 'enemyCaught', 'turnLength', 'gameOver'].includes(anim)) {
+      /*
+      if (['enemyFlee', 'enemyCaught', 'enemyEscape', 'turnLength', 'gameOver'].includes(anim)) {
         SafariBattle.Speed[anim] = autoSafariFastAnimationsState ? CACHED_ANIM_SPEEDS[anim] / 2 : CACHED_ANIM_SPEEDS[anim];
       } else {
         SafariBattle.Speed[anim] = autoSafariFastAnimationsState ? 0 : CACHED_ANIM_SPEEDS[anim];
-      }
+      }*/
+      SafariBattle.Speed[anim] = autoSafariFastAnimationsState ? CACHED_ANIM_SPEEDS[anim] / 2 : CACHED_ANIM_SPEEDS[anim];
     }
     Safari.moveSpeed = autoSafariFastAnimationsState ? CACHED_MOVE_SPEED / 2 : CACHED_MOVE_SPEED;
+
     if (autoSafariState) {
       clearInterval(autoSafariProcessId);
       startAutoSafari();
@@ -342,7 +422,7 @@ function initAutoSafari() {
     toggleButton.classList.toggle('btn-danger', !autoSafariThrowBaitsState);
     toggleButton.classList.toggle('btn-success', autoSafariThrowBaitsState);
     localStorage.setItem('autoSafariThrowBaitsState', autoSafariThrowBaitsState);
-    document.getElementById('auto-throw-baits-toggle').innerHTML = `Auto Throw Baits [${autoSafariThrowBaitsState ? 'ON' : 'OFF'}]`;
+    document.getElementById('auto-throw-baits-toggle').innerHTML = `Auto Throw Bait [${autoSafariThrowBaitsState ? 'ON' : 'OFF'}]`;
   }
 
   function toggleSeekUncaught() {
@@ -351,7 +431,7 @@ function initAutoSafari() {
     toggleButton.classList.toggle('btn-danger', !autoSafariSeekUncaught);
     toggleButton.classList.toggle('btn-success', autoSafariSeekUncaught);
     localStorage.setItem('autoSafariSeekUncaught', autoSafariSeekUncaught);
-    document.getElementById('auto-seek-uncaught-toggle').innerHTML = `Auto Seek Uncaught [${autoSafariSeekUncaught ? 'ON' : 'OFF'}]`;
+    document.getElementById('auto-seek-uncaught-toggle').innerHTML = `Auto Seek New [${autoSafariSeekUncaught ? 'ON' : 'OFF'}]`;
   }
 
   function toggleSeekContagious() {
