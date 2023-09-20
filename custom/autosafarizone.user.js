@@ -412,19 +412,19 @@ function initAutoSafari() {
     }
     // Try to catch!
     else {
-      // If this is the last ball, add some delay to avoid breaking the safari exiting process 
-      if (Safari.balls() == 1) {
-        skipTicks += 6 * (autoSafariFastAnimationsState ? 2 : 1);
-      }
       SafariBattle.throwBall();
       threwBall = true;
     }
     // Handle implications of using a ball
     if (threwBall) {
       // Handle Safari game over
-      if (Safari.balls() == 1) {
+      if (Safari.balls() <= 0) {
         // Add some delay to avoid breaking the safari exiting process
         skipTicks += Math.ceil(40 * (autoSafariFastAnimationsState ? 2 : 1) * SafariBattle.tierMultiplier(Safari.safariLevel()));
+        // Just in case the negative balls glitch returns
+        if (Safari.balls() < 0) {
+          SafariBattle.gameOver();
+        }
       }
       // In case we caught a priority spawn, recalculate the optimal encounter tiles next time 
       else if (isPriority && hasPrioritySpawns == 1) {
