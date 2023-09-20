@@ -412,6 +412,10 @@ function initAutoSafari() {
     }
     // Try to catch!
     else {
+      // If this is the last ball, add some delay to avoid breaking the safari exiting process 
+      if (Safari.balls() == 1) {
+        skipTicks += 6 * (autoSafariFastAnimationsState ? 2 : 1);
+      }
       SafariBattle.throwBall();
       threwBall = true;
     }
