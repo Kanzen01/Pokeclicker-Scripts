@@ -266,7 +266,7 @@ function initAutoSafari() {
     }
 
     for (const [adjRow, adjCol] of adjacentTiles) {
-      if (isValidPosition(adjRow, adjCol) && compareFunc(Safari.grid[row][col], Safari.grid[adjRow][adjCol])) {
+      if (isValidPosition(adjRow, adjCol) && compareFunc(Safari.grid[adjRow][adjCol])) {
         return false; // Found an adjacent tile with the same value
       }
     }
@@ -325,6 +325,7 @@ function initAutoSafari() {
     const forceRunAway = (scriptState !== SCRIPT_STATES.encounters || (Safari.balls() == 1 && Safari.itemGrid().length > 0 && !forceSkipItems)) && !SafariBattle.enemy.shiny;
     const isPriority = (autoSafariSeekUncaught && !App.game.party.alreadyCaughtPokemon(SafariBattle.enemy.id))
         || (autoSafariSeekContagious && App.game.party.getPokemon(SafariBattle.enemy.id)?.pokerus === GameConstants.Pokerus.Contagious);
+    let threwBall = false;
 
     if (SafariBattle.busy()) {
       return;
@@ -334,6 +335,8 @@ function initAutoSafari() {
       if (autoSafariFastAnimationsState) {
         skipTicks += 1;
       }
+      // Remove any bugged Safari Ball animations
+      document.querySelectorAll('#safariBattleModal #safariBall').forEach((ball) => ball.remove());
       return;
     }
 
@@ -341,7 +344,6 @@ function initAutoSafari() {
     if (SafariBattle.enemy.shiny) {
       let canNanab = App.game.farming.berryList[BerryType.Nanab]() > 5;
       let canRazz = App.game.farming.berryList[BerryType.Razz]() > 5;
-      let threwBall = false;
       // Bait is usually the best approach
       if (!(SafariBattle.enemy.angry || SafariBattle.enemy.eating || SafariBattle.enemy.eatingBait !== BaitType.Bait)) {
         // Nanab is highest catch chance, though not highest catch-per-ball efficiency
@@ -419,13 +421,9 @@ function initAutoSafari() {
       if (Safari.balls() == 1) {
         // Add some delay to avoid breaking the safari exiting process
         skipTicks += Math.ceil(40 * (autoSafariFastAnimationsState ? 2 : 1) * SafariBattle.tierMultiplier(Safari.safariLevel()));
-        // Remove any bugged Safari Ball animations
-        setTimeout(() => {
-          document.querySelectorAll('#safariBall').forEach((ball) => ball.remove())
-        }, 7500 * SafariBattle.tierMultiplier(Safari.safariLevel()));
       }
       // In case we caught a priority spawn, recalculate the optimal encounter tiles next time 
-      if (isPriority && hasPrioritySpawns == 1) {
+      else if (isPriority && hasPrioritySpawns == 1) {
         hasPrioritySpawns = 0;
       } 
     }
