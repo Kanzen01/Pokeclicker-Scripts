@@ -340,6 +340,7 @@ function initAutoSafari() {
       return;
     }
 
+
     // Handle shiny encounters specially
     if (SafariBattle.enemy.shiny) {
       let canNanab = App.game.farming.berryList[BerryType.Nanab]() > 5;
